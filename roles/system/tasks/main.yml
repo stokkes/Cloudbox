@@ -13,6 +13,7 @@
 
 - name: System sysctl task
   include_tasks: "systctl.yml"
+  when: lxc is not defined
 
 - name: System mounts task
   include_tasks: "mounts.yml"
