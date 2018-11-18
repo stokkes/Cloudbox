@@ -15,10 +15,10 @@
     - /home/{{user}}/.config
     - /home/{{user}}/.config/pip
     - /mnt/local
-    - /mnt/local/Media
-    - /mnt/local/Media/Movies
-    - /mnt/local/Media/Music
-    - /mnt/local/Media/TV
+#     - /mnt/local/Media
+#     - /mnt/local/Media/Movies
+#     - /mnt/local/Media/Music
+#     - /mnt/local/Media/TV
     - /opt
 
 - name: Add multiverse repositories
