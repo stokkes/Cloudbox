@@ -1,0 +1,61 @@
+#########################################################################
+# Title:         Cloudbox: Sonarr v3 Role                               #
+# Author(s):     Stokkes                                                #
+# Based on:		 Cloudbox: Sonarrv3 by Superduper09                     #
+# URL:           https://github.com/stokkes/cloudbox                    #
+# --                                                                    #
+#########################################################################
+#                   GNU General Public License v3.0                     #
+#########################################################################
+---
+- name: "Set DNS Record on CloudFlare"
+  include_role:
+    name: cloudflare
+  vars:
+    subdomain: sonarr
+
+- name: Stop and remove any existing container
+  docker_container:
+    name: sonarr
+    state: absent
+
+- name: Create sonarr directories
+  file: "path={{item}} state=directory mode=0775 owner={{user}} group={{user}}"
+  with_items:
+    - /opt/sonarr
+
+- name: Set default_volumes variable
+  set_fact:
+    default_volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/opt/sonarr:/config"
+      - "/opt/scripts:/scripts"
+      - "/mnt:/mnt"
+      
+- name: Create and start container
+  docker_container:
+    name: sonarr
+    image: "lsiodev/sonarr-preview"
+    pull: yes
+    published_ports:
+      - "127.0.0.1:8989:8989"
+    env:
+      VERSION: "unstable"
+      BACKUP: "no"
+      PUID: "{{uid}}"
+      PGID: "{{gid}}"
+      MONO_TLS_PROVIDER: legacy
+      VIRTUAL_HOST: "sonarr.{{domain}}"
+      VIRTUAL_PORT: 8989
+      LETSENCRYPT_HOST: "sonarr.{{domain}}"
+      LETSENCRYPT_EMAIL: "{{email}}"
+    volumes: "{{ default_volumes + nzbs_downloads_path|default([]) + torrents_downloads_path|default([]) + old_nzbget_downloads_path|default([]) + old_rutorrent_downloads_path|default([]) }}"
+    labels:
+      "com.github.cloudbox.cloudbox_managed": "true"
+    networks:
+      - name: cloudbox
+        aliases:
+          - sonarr
+    purge_networks: yes
+    restart_policy: always
+    state: started
