@@ -79,7 +79,7 @@
     published_ports:
       - "127.0.0.1:8989:8989"
     env:
-      VERSION: "{{suitarr.version}}"
+      VERSION: "v3"
       BACKUP: "no"
       PUID: "{{uid}}"
       PGID: "{{gid}}"
