@@ -1,0 +1,32 @@
+[Unit]
+Description=Media Service - rclone mount component
+PartOf=media.service
+RequiresMountsFor=/mnt/local
+
+[Service]
+Type=notify
+User={{user}}
+Group={{user}}
+
+ExecStart=/usr/bin/rclone mount {{rclone_remote}} /mnt/rclone \
+   --allow-other \
+   --allow-non-empty \
+   --dir-cache-time=72h \
+   --buffer-size=1G \
+   --vfs-read-chunk-size=128M \
+   --vfs-read-chunk-size-limit off \
+   --vfs-cache-mode writes \
+   --drive-chunk-size 32M \
+   --fast-list \
+   --umask 002 \
+   --rc \
+   --syslog \
+   --log-level INFO
+ExecStop=/bin/fusermount -uz /mnt/rclone
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=3
+
+[Install]
+WantedBy=media.service

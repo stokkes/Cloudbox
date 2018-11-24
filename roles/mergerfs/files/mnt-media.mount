@@ -1,0 +1,14 @@
+[Unit]
+Description = Media Service - MergerFS Mount
+PartOf=media.service
+After=media-rclone.service
+RequiresMountsFor=/mnt/local
+
+[Mount]
+What = /mnt/local:/mnt/rclone
+Where = /mnt/media
+Type = fuse.mergerfs
+Options = use_ino,hard_remove,auto_cache,sync_read,allow_other,category.action=all,category.create=ff
+
+[Install]
+WantedBy=media.service

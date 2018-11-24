@@ -1,0 +1,106 @@
+#########################################################################
+# Title:         Cloudbox: MergerFS Role                                #
+# Author(s):     Stokkes                                                #
+# Based on:		 Cloudbox: UnionFS by L3uddz, ,Desimaniac			    #
+# URL:           https://github.com/stokkes/cloudbox                    #
+# --                                                                    #
+#########################################################################
+#                   GNU General Public License v3.0                     #
+#########################################################################
+---
+- name: Check if media service exists
+  stat:
+    path: "/etc/systemd/system/media.service"
+  register: media_service
+
+- name: Populate Service Facts
+  service_facts:
+  when: media_service.stat.exists
+
+- name: Get media service state
+  set_fact:
+    media_service_running: "{{ (services['media.service'] is defined) and (services['media.service']['state'] == \"running\") }}"
+  when: media_service.stat.exists
+
+- name: Stop existing media service
+  systemd: state=stopped name=media
+  when: media_service.stat.exists and media_service_running
+
+- name: Get rclone remote if it's not defined
+  pause:
+    prompt: "To continue with MergerFS, please enter your rclone remote and path to your media. Examples: drive: , drive:Media/, etc."
+  register: rclone_remote_prompt
+  when: rclone.remote is not defined
+  
+- name: "Set 'rclone.remote' variable"
+  set_fact:
+    rclone_remote: "{{rclone_remote_prompt.user_input}}"
+  when: rclone.remote is not defined
+
+- name: "Display rclone remote"
+  debug: msg="Using rclone remote {{rclone_remote}}"
+  when: rclone.remote is not defined
+
+- name: Set rclone remote variable
+  set_fact:
+    rclone_remote: "{{rclone.remote}}"
+  when: rclone.remote is defined
+  
+- name: Fail if rclone_remote is not defined
+  fail:
+    msg: "Rclone remote is not defined, please ensure you define the rclone.remote variable in your settings.yml file"
+  when:  rclone_remote is not defined
+  
+- name: Check if mount path exists
+  stat:
+    path: "/mnt/media"
+  register: mount_path
+
+- name: "Force unmount /mnt/media"
+  shell: "/bin/fusermount -uz /mnt/media"
+  when: mount_path.stat.exists
+  ignore_errors: yes
+
+- name: Create mergerfs directories
+  file: "path={{item}} state=directory mode=0775 owner={{user}} group={{user}}"
+  with_items:
+    - /mnt/media
+    - /mnt/rclone
+
+- name: Install fuse
+  apt:
+    name: fuse
+    state: present
+
+- name: Import fuse.conf
+  copy: src=fuse.conf dest=/etc/fuse.conf force=yes
+
+- name: Install mergerfs
+  apt:
+    name: mergerfs
+    state: present
+
+- name: Import media.service
+  copy: src=media.service dest=/etc/systemd/system/media.service force=yes
+  when: not media_service.stat.exists
+
+- name: Import mnt-media.mount
+  copy: src=mnt-media.mount dest=/etc/systemd/system/mnt-media.mount force=yes
+  when: not media_service.stat.exists
+
+- name: Import media-rclone.service
+  template:
+    src: media-rclone.service.js2
+    dest: /etc/systemd/system/media-rclone.service
+    force: yes
+  when: not media_service.stat.exists
+
+- name: Enable media service rclone mount
+  systemd: state=started name=media-rclone daemon_reload=yes enabled=yes
+
+- name: Enable media service mergerfs mount
+  systemd: state=started name=mnt-media.mount daemon_reload=yes enabled=yes
+
+- name: Start media service
+  systemd: state=started name=media daemon_reload=yes enabled=yes
+
