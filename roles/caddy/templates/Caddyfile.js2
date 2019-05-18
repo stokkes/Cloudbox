@@ -1,0 +1,4 @@
+# Caddyfile
+
+# Import site configurations
+import /opt/caddy/conf/*.conf

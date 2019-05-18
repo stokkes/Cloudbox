@@ -1,0 +1,129 @@
+#########################################################################
+# Title:         Cloudbox: Caddy Role                                   #
+# Author(s):     Stokkes                                                #
+# URL:           https://github.com/stokkes/cloudbox                    #
+# --                                                                    #
+#########################################################################
+#                   GNU General Public License v3.0                     #
+#########################################################################
+---  
+- name: Check if Docker is installed
+  stat:
+    path: /usr/bin/docker
+  register: dockerbin
+
+- name: Include Docker role if docker is not found
+  include_role:
+    name: docker
+  when: not dockerbin.stat.exists
+
+- name: Stop and remove any existing container
+  docker_container:
+    name: caddy
+    state: absent
+
+- name: Create directories
+  file: "path={{item}} state=directory mode=0775 owner={{user}} group={{user}}"
+  with_items:
+    - "/opt/caddy"
+    - "/opt/caddy/conf"
+    - "/opt/caddy/logs"
+    
+- name: Copy Caddyfile
+  template: "src=Caddyfile.js2 dest=/opt/caddy/Caddyfile owner={{user}} group={{user}} mode=0644"
+
+- name: Create Plex caddy config
+  template: "src=plex.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "plex.{{domain}}"
+    - caddy_host: "plex.lxd"
+    - caddy_port: "32400"
+
+- name: Create Tautulli caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "tautulli.{{domain}}"
+    - caddy_host: "plex.lxd"
+    - caddy_port: "8181"
+
+- name: Create NZBGet caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "nzbget.{{domain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "6789"
+
+- name: Create ruTorrent caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "rutorrent.{{domain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "3111"
+
+- name: Create NZBHydra caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "hydra.{{domain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "5076"
+
+- name: Create Sonarr caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "sonarr.{{domain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "8989"
+
+- name: Create Radarr caddy config
+  template: "src=default.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "radarr.{{domain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "7878"
+
+- name: Create Ombi caddy config
+  template: "src=ombi.conf.js2 dest=/opt/caddy/conf/{{caddy_dns}}.conf owner={{user}} group={{user}} mode=0644"
+  vars:
+    - caddy_dns: "{{ombi.subdomain}}"
+    - caddy_host: "feeder.lxd"
+    - caddy_port: "3579"
+
+- name: "Compile Caddy and create Docker container (this will take a while)"
+  docker_service:
+    project_name: caddy
+    nocache: true
+    build: true
+    definition:
+      version: '2'
+      services:
+        app:
+          container_name: caddy
+          build:
+            context: github.com/abiosoft/caddy-docker.git
+            args:
+              plugins: git, cache, cors, expires, jwt, login, minify, realip, cloudflare
+          restart: always
+          ports:
+            - "80:80"
+            - "443:443"
+          volumes:
+            - "/opt/caddy/Caddyfile:/etc/Caddyfile"
+            - "/opt/caddy:/opt/caddy"
+          networks:
+            cloudbox:
+              aliases:
+                - caddy
+          environment:
+            - CADDYPATH=/opt/caddy
+            - CLOUDFLARE_EMAIL={{email}}
+            - CLOUDFLARE_API_KEY={{cloudflare_api_token}}
+      networks:
+        cloudbox:
+            external: true
+
+# - name: Wait 10 seconds for container to start
+#   wait_for: 
+#     timeout: 10
+# 
+# - name: Import nginx site-templates
+#   import_tasks: site-templates.yml
